@@ -126,8 +126,7 @@
                     <th>Present State</th>
                     <th>Next State (X=0)</th>
                     <th>Next State (X=1)</th>
-                    <th>Output (X=0)</th>
-                    <th id="out1Header">Output (X=1)</th>
+                    <th id="out0Header">Output (X=0)</th> <th id="out1Header">Output (X=1)</th>
                 </tr>
             </thead>
             <tbody id="fsmInputBody">
@@ -150,16 +149,32 @@
         let N = 0;
 
         function setupFSMTable() {
-            const typeSelect = document.getElementById('machineType').value;
-            isMealy = (typeSelect === 'mealy');
+            // 1. 永遠先把驗證放在最前面
             N = parseInt(document.getElementById('numStates').value);
-
             if (isNaN(N) || N < 2) {
                 alert("Please enter a valid number of states (>= 2).");
                 return;
             }
 
-            document.getElementById('out1Header').style.display = isMealy ? 'table-cell' : 'none';
+            // 2. 設定參數
+            const typeSelect = document.getElementById('machineType').value;
+            isMealy = (typeSelect === 'mealy');
+
+            // 3. 取得表頭元素
+            const out0Header = document.getElementById('out0Header'); 
+            const out1Header = document.getElementById('out1Header');
+
+            // 4. 動態修改表頭文字與顯示狀態
+            if (isMealy) {
+                out0Header.innerText = "Output (X=0)";
+                out1Header.style.display = 'table-cell';
+                out1Header.innerText = "Output (X=1)";
+            } else {
+                out0Header.innerText = "Output"; 
+                out1Header.style.display = 'none'; // Moore 隱藏第二個欄位
+            }
+
+            // 5. 生成表格內容
             const tbody = document.getElementById('fsmInputBody');
             tbody.innerHTML = '';
 
