@@ -149,29 +149,30 @@
         let N = 0;
 
         function setupFSMTable() {
-            // 1. 永遠先把驗證放在最前面
+            // 1. 驗證輸入了多少個 state
             N = parseInt(document.getElementById('numStates').value);
             if (isNaN(N) || N < 2) {
                 alert("Please enter a valid number of states (>= 2).");
                 return;
             }
 
-            // 2. 設定參數
+            // 2. 根據 machine type 決定參數
             const typeSelect = document.getElementById('machineType').value;
             isMealy = (typeSelect === 'mealy');
 
-            // 3. 取得表頭元素
+            // 3. get header elements
             const out0Header = document.getElementById('out0Header'); 
             const out1Header = document.getElementById('out1Header');
 
-            // 4. 動態修改表頭文字與顯示狀態
+            // 4. 動態調整 UI header：
+            // Mealy machine 有兩個 Output, Moore machine 則只有一個
             if (isMealy) {
                 out0Header.innerText = "Output (X=0)";
                 out1Header.style.display = 'table-cell';
                 out1Header.innerText = "Output (X=1)";
             } else {
                 out0Header.innerText = "Output"; 
-                out1Header.style.display = 'none'; // Moore 隱藏第二個欄位
+                out1Header.style.display = 'none'; // Moore machine 隱藏第二個欄位
             }
 
             // 5. 生成表格內容
@@ -179,8 +180,10 @@
             tbody.innerHTML = '';
 
             for (let i = 0; i < N; i++) {
+                // 生成狀態名稱 (a,b,...)
                 const defaultName = String.fromCharCode(97 + i); 
                 const tr = document.createElement('tr');
+                // 根據 isMealy 的狀態，決定 Output (X=1) 欄位是否顯示
                 tr.innerHTML = `
                     <td><input type="text" class="state-name" value="${defaultName}" required></td>
                     <td><input type="text" class="next0" required></td>
@@ -190,11 +193,12 @@
                 `;
                 tbody.appendChild(tr);
             }
-
+            // 6. 畫面切換：隱藏配置步驟，顯示輸入表格步驟
             document.getElementById('step1').style.display = 'none';
             document.getElementById('step2').style.display = 'block';
         }
 
+        // 重設全部
         function resetApp() {
             document.getElementById('step1').style.display = 'block';
             document.getElementById('step2').style.display = 'none';
@@ -205,43 +209,53 @@
         }
 
         async function scanImage() {
+            // 1. Get Document Object Model elements
             const fileInput = document.getElementById('imageInput');
             const statusText = document.getElementById('scanStatus');
             const scanBtn = document.getElementById('scanBtn');
 
+            // 2. 防呆機制，避免使用者沒選檔案就按 scan 按鈕
             if (fileInput.files.length === 0) {
                 alert("Please upload an image first.");
                 return;
             }
 
             try {
+                // 3. UI 狀態管理：為了避免使用者重複送出檔案，鎖住按鈕
                 statusText.innerText = "Uploading to server and analyzing... please wait.";
                 statusText.style.color = "#ca8a04";
                 scanBtn.disabled = true;
-
+                
+                // 4. 準備 Payload：使用 FormData 封裝檔案
                 const formData = new FormData();
                 formData.append('image', fileInput.files[0]);
 
+                // 5. 發送 POST 請求給後端 API
                 const response = await fetch('/scan', {
                     method: 'POST',
                     body: formData
                 });
 
+                // 6. 檢查 API 回應：如果後端回傳 4xx 或 5xx 錯誤，就拋出異常進入 catch 區塊
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || `Server error: ${response.status}`);
                 }
 
+                // 7. 成功處理：解析 JSON 並執行自動填表邏輯
                 const aiResponseJSON = await response.json();
                 autoGenerateAndFill(aiResponseJSON);
+                // 更新狀態提示詞為成功
                 statusText.innerText = "Scan Complete! Please verify the data.";
                 statusText.style.color = "#16a34a";
 
             } catch (error) {
+                // 8. 異常處理：捕獲網路錯誤或 API 錯誤，並顯示在 UI 上
                 statusText.innerText = `Scan failed: ${error.message}`;
                 statusText.style.color = "#dc2626";
                 console.error("Backend API Error:", error);
             } finally {
+                // 9. 最後清理：無論成功或失敗，都要解鎖按鈕，讓使用者可以再次嘗試
                 scanBtn.disabled = false;
             }
         }
@@ -293,6 +307,7 @@
         }
 
         function runMinimization() {
+            // 1. UI 初始化與輸入防呆
             const errorDiv = document.getElementById('inputError');
             errorDiv.innerText = '';
 
@@ -300,6 +315,7 @@
             const stateNames = [];
             const fsmData = [];
 
+            // 檢查狀態名稱是否合法（非空、不可重複）
             rows.forEach(row => {
                 const name = row.querySelector('.state-name').value.trim();
                 if(!name) { errorDiv.innerText = "[Error] State name cannot be empty."; return; }
@@ -308,6 +324,7 @@
             });
             if(errorDiv.innerText !== '') return;
 
+            // 2. 建立資料結構：將字串轉為數字索引，用於陣列運算
             for (let i = 0; i < N; i++) {
                 const row = rows[i];
                 const next0 = row.querySelector('.next0').value.trim();
@@ -315,6 +332,7 @@
                 const out0 = row.querySelector('.out0').value.trim();
                 const out1 = isMealy ? row.querySelector('.out1').value.trim() : out0;
 
+                // 檢查 Next State 是否存在於定義列表中
                 if(!stateNames.includes(next0) || !stateNames.includes(next1)) {
                     errorDiv.innerText = `[Error] Next state at row '${stateNames[i]}' is not defined in the state list.`;
                     return;
@@ -328,16 +346,19 @@
                 });
             }
 
+            // 3. Initialize Implication Table
+            // 建立 NxN 的 2D array，每個元素包含化簡所需的狀態資料
             let table = Array.from({length: N}, () => Array(N).fill(null).map(() => ({
-                isInvalid: false,
-                crossPass: -1,
-                dependencies: [],
-                failedReason: null
+                isInvalid: false,   // 是否已被標記為不可化簡 (X)
+                crossPass: -1,      // 在第幾 pass 被標記的
+                dependencies: [],   // 若此項需依賴其他狀態對，則儲存在這
+                failedReason: null  // 用以紀錄失敗的因素
             })));
 
-            const history = [];
+            const history = [];     // 儲存每一輪的表格狀態，方便前端渲染
 
-            // Pass 0
+            // 4. Pass 0: 根據 Output 不同直接將格子打 X
+            // 若輸出不同，則不可化簡 (X)；若輸出相同，則記錄其依賴的下一狀態對
             for (let i = 1; i < N; i++) {
                 for (let j = 0; j < i; j++) {
                     const s_i = fsmData[i];
@@ -347,11 +368,13 @@
                         table[i][j].isInvalid = true;
                         table[i][j].crossPass = 0;
                     } else {
+                        // 若輸出相同，則將下一狀態對加入依賴清單
                         if (s_i.next0 !== s_j.next0) {
                             table[i][j].dependencies.push([Math.max(s_i.next0, s_j.next0), Math.min(s_i.next0, s_j.next0)]);
                         }
                         if (s_i.next1 !== s_j.next1) {
                             const dep1 = [Math.max(s_i.next1, s_j.next1), Math.min(s_i.next1, s_j.next1)];
+                            // 避免重複加入相同的依賴
                             if (table[i][j].dependencies.length === 0 || 
                                 table[i][j].dependencies[0][0] !== dep1[0] || 
                                 table[i][j].dependencies[0][1] !== dep1[1]) {
@@ -361,8 +384,10 @@
                     }
                 }
             }
-            history.push(JSON.parse(JSON.stringify(table)));
+            history.push(JSON.parse(JSON.stringify(table))); // 表格存入 Pass 0 歷史
 
+            // 5. Pass 1,2,...: 重複尋找所有不可化簡狀態
+            // 只要有任何狀態對的「依賴對象」變成 X，該狀態對本身也要變成 X
             let changed = true;
             let passCount = 1;
 
@@ -371,6 +396,7 @@
                 for (let i = 1; i < N; i++) {
                     for (let j = 0; j < i; j++) {
                         if (!table[i][j].isInvalid) {
+                            // 檢查所有依賴的狀態對，若有一個已標記為 X，則此狀態對亦變為 X
                             for (let dep of table[i][j].dependencies) {
                                 if (table[dep[0]][dep[1]].isInvalid) {
                                     table[i][j].isInvalid = true;
@@ -383,12 +409,13 @@
                         }
                     }
                 }
+                // 若本輪有變動，將表格存入歷史紀錄並繼續下一輪
                 if (changed) {
                     history.push(JSON.parse(JSON.stringify(table)));
                     passCount++;
                 }
             }
-
+            // 6. UI 切換
             document.getElementById('step2').style.display = 'none';
             document.getElementById('step3').style.display = 'block';
             renderSteps(history, stateNames, fsmData);
@@ -396,9 +423,10 @@
 
         function renderSteps(history, stateNames, fsmData) {
             const container = document.getElementById('resultsContainer');
-            container.innerHTML = '';
+            container.innerHTML = ''; // 清除舊結果
             const N = stateNames.length;
 
+            // 1. 渲染化簡過程
             history.forEach((tableState, passIndex) => {
                 const stepTitle = document.createElement('h3');
                 stepTitle.innerHTML = (passIndex === 0) ? "Step 1: Initial Setup" : `Step ${passIndex + 1}: Sweep Pass ${passIndex}`;
@@ -407,32 +435,38 @@
                 const tableHTML = document.createElement('table');
                 tableHTML.className = 'impl-table';
                 
-                // 產生每一列 (Row Headers + Cells)
+                // Generate each row
                 for (let i = 1; i < N; i++) {
                     const tr = document.createElement('tr');
                     const thRow = document.createElement('th');
-                    thRow.innerText = stateNames[i]; // 左側表頭 (Row Header)
+                    thRow.innerText = stateNames[i]; // left header
                     tr.appendChild(thRow);
 
+                    // 產生 implication table 中的比較格
                     for (let j = 0; j < i; j++) {
                         const td = document.createElement('td');
                         const cell = tableState[i][j];
 
+                        // 根據狀態進行 UI 渲染
                         if (cell.isInvalid) {
+                            // 已標記不可化簡
                             const colorClass = `pass-${Math.min(cell.crossPass, 5)}`;
                             td.className = `invalid-cell ${colorClass}`;
                             if (cell.crossPass === 0) {
                                 td.innerText = "X";
                             } else {
+                                // 顯示失敗因素
                                 const idx1 = Math.min(cell.failedReason[0], cell.failedReason[1]);
                                 const idx2 = Math.max(cell.failedReason[0], cell.failedReason[1]);
                                 td.innerHTML = `X<span class="reason-text">by (${stateNames[idx1]},${stateNames[idx2]})</span>`;
                             }
                         } else {
+                            // 尚未標記或已經等價
                             if (cell.dependencies.length === 0) {
                                 td.className = 'valid-cell';
                                 td.innerText = "OK";
                             } else {
+                                // 顯示需要觀察的依賴狀態對
                                 td.className = 'dep-cell';
                                 let depStr = "";
                                 cell.dependencies.forEach(dep => {
@@ -446,7 +480,7 @@
                         tr.appendChild(td);
                     }
                     
-                    // 補齊右側空白格，維持表格完整性
+                    // 補齊右側空白格，維持下三角矩陣形狀
                     for(let j = i; j < N - 1; j++) {
                         const tdEmpty = document.createElement('td');
                         tdEmpty.className = 'empty-cell';
@@ -455,7 +489,7 @@
                     tableHTML.appendChild(tr);
                 }
 
-                // --- 修改重點：在最下方產生表頭 (Column Headers) ---
+                // 產生下方 header
                 const trBottom = document.createElement('tr');
                 const tdEmptyCorner = document.createElement('td'); // 左下角空白格
                 tdEmptyCorner.className = 'empty-cell';
@@ -467,7 +501,6 @@
                     trBottom.appendChild(thCol);
                 }
                 tableHTML.appendChild(trBottom);
-                // --------------------------------------------------
 
                 const wrapper = document.createElement('div');
                 wrapper.className = 'impl-table-container';
@@ -475,18 +508,21 @@
                 container.appendChild(wrapper);
             });
 
-            // (下方 Final Minimized FSM 表格渲染邏輯保持不變...)
+            // 2. 最終化簡 FSM 表格渲染
+            // 利用併查集概念找出等價狀態組
             const finalTable = history[history.length - 1];
             const parent = {}; stateNames.forEach(n => parent[n] = n);
+            // 將等價狀態連結起來
             for(let i=1; i<N; i++) for(let j=0; j<i; j++) if(!finalTable[i][j].isInvalid) parent[stateNames[i]] = stateNames[j];
-            
+            // 遞迴尋找該狀態所屬分組的代表狀態
             const getRep = (s) => (parent[s] === s ? s : getRep(parent[s]));
+            // 將所有狀態依據代表狀態分組
             const minMap = {};
             stateNames.forEach((n, idx) => {
                 const rep = getRep(n);
                 if(!minMap[rep]) minMap[rep] = fsmData[idx];
             });
-
+            // 渲染最終表格
             const minContainer = document.createElement('div');
             minContainer.innerHTML = `<h3>Final Minimized FSM</h3>`;
             const minTableHTML = document.createElement('table');
@@ -494,11 +530,11 @@
             minTableHTML.innerHTML = `<thead><tr><th>State</th><th>Next(0)</th><th>Next(1)</th><th>Out(0)</th>${isMealy ? '<th>Out(1)</th>' : ''}</tr></thead><tbody id="minBody"></tbody>`;
             const minBody = minTableHTML.querySelector('#minBody');
             
-            // --- 修改這一段，加入 getRep 的名稱映射 ---
+            // 輸出表格列：使用 getRep 確保顯示的是分組代表名稱
             Object.keys(minMap).sort().forEach(rep => {
                 const row = minMap[rep];
                 
-                // 這裡就是關鍵：把原本的指標轉換成該分組的「代表名稱」
+                // 把原本的指標轉換成該分組的「代表名稱」
                 const next0Rep = getRep(stateNames[row.next0]);
                 const next1Rep = getRep(stateNames[row.next1]);
 
@@ -510,7 +546,7 @@
                                 ${isMealy ? `<td>${row.out1}</td>` : ''}`;
                 minBody.appendChild(tr);
             });
-            // ----------------------------------------
+            
             container.appendChild(minContainer);
             container.appendChild(minTableHTML);
         }
