@@ -189,9 +189,6 @@
             document.getElementById('imageInput').value = '';
         }
 
-        // ==========================================
-        // 新增：串接後端 Python API 的非同步函數
-        // ==========================================
         async function scanImage() {
             const fileInput = document.getElementById('imageInput');
             const statusText = document.getElementById('scanStatus');
@@ -204,10 +201,9 @@
 
             try {
                 statusText.innerText = "Uploading to server and analyzing... please wait.";
-                statusText.style.color = "#ca8a04"; // 黃色
+                statusText.style.color = "#ca8a04";
                 scanBtn.disabled = true;
 
-                // 將圖片打包進 FormData
                 const formData = new FormData();
                 formData.append('image', fileInput.files[0]);
 
@@ -222,43 +218,36 @@
                 }
 
                 const aiResponseJSON = await response.json();
-
-                // 自動填入表格
-                autoGenerateAndFill(aiResponseJSON); // 改成呼叫這個新函式
+                autoGenerateAndFill(aiResponseJSON);
                 statusText.innerText = "Scan Complete! Please verify the data.";
-                statusText.style.color = "#16a34a"; // 綠色
+                statusText.style.color = "#16a34a";
 
             } catch (error) {
                 statusText.innerText = `Scan failed: ${error.message}`;
-                statusText.style.color = "#dc2626"; // 紅色
+                statusText.style.color = "#dc2626";
                 console.error("Backend API Error:", error);
             } finally {
                 scanBtn.disabled = false;
             }
         }
 
-        // AI 掃描完畢後，由「數據」反向驅動「介面生成」
         function autoGenerateAndFill(aiData) {
             const transitions = aiData.transitions;
-            const detectedType = aiData.detected_type; // 'mealy' 或 'moore'
+            const detectedType = aiData.detected_type;
 
-            // 1. AI 幫我們決定全域變數
             N = transitions.length;
             isMealy = (detectedType === 'mealy');
 
-            // 2. 動態修改 HTML 表格頭部（如果是 Moore，隱藏第二個 Output 標題）
             const out1Header = document.getElementById('out1Header');
             if (out1Header) {
                 out1Header.style.display = isMealy ? 'table-cell' : 'none';
             }
 
-            // 3. 動態清空並「無中生有」生出 N 個輸入列
             const tbody = document.getElementById('fsmInputBody');
             tbody.innerHTML = '';
 
             transitions.forEach((rowData, index) => {
                 const tr = document.createElement('tr');
-                
                 tr.innerHTML = `
                     <td><input type="text" class="state-name" value="${rowData.state || ''}" required></td>
                     <td><input type="text" class="next0" value="${rowData.next0 || ''}" required></td>
@@ -270,11 +259,8 @@
                 `;
                 tbody.appendChild(tr);
             });
-
-            // 4. 在介面上給使用者一個驚喜提示
             alert(`[AI Auto-Detect] Identified as a ${detectedType.toUpperCase()} machine with ${N} states!`);
         }
-        // ==========================================
 
         function runMinimization() {
             const errorDiv = document.getElementById('inputError');
@@ -339,7 +325,7 @@
                             if (table[i][j].dependencies.length === 0 || 
                                 table[i][j].dependencies[0][0] !== dep1[0] || 
                                 table[i][j].dependencies[0][1] !== dep1[1]) {
-                                table[i][j].dependencies.push(dep1);
+                                    table[i][j].dependencies.push(dep1);
                             }
                         }
                     }
@@ -347,7 +333,6 @@
             }
             history.push(JSON.parse(JSON.stringify(table)));
 
-            // Pass 1...K
             let changed = true;
             let passCount = 1;
 
@@ -376,21 +361,17 @@
 
             document.getElementById('step2').style.display = 'none';
             document.getElementById('step3').style.display = 'block';
-            renderSteps(history, stateNames);
+            renderSteps(history, stateNames, fsmData);
         }
 
-        function renderSteps(history, stateNames) {
+        function renderSteps(history, stateNames, fsmData) {
             const container = document.getElementById('resultsContainer');
             container.innerHTML = '';
             const N = stateNames.length;
 
             history.forEach((tableState, passIndex) => {
                 const stepTitle = document.createElement('h3');
-                if (passIndex === 0) {
-                    stepTitle.innerHTML = "Step 1: Initial Setup (Output Mismatch & Dependencies)";
-                } else {
-                    stepTitle.innerHTML = `Step ${passIndex + 1}: Sweep Pass ${passIndex}`;
-                }
+                stepTitle.innerHTML = (passIndex === 0) ? "Step 1: Initial Setup" : `Step ${passIndex + 1}: Sweep Pass ${passIndex}`;
                 container.appendChild(stepTitle);
 
                 const tableHTML = document.createElement('table');
@@ -398,7 +379,6 @@
                 
                 for (let i = 1; i < N; i++) {
                     const tr = document.createElement('tr');
-                    
                     const thRow = document.createElement('th');
                     thRow.innerText = stateNames[i];
                     tr.appendChild(thRow);
@@ -410,15 +390,12 @@
                         if (cell.isInvalid) {
                             const colorClass = `pass-${Math.min(cell.crossPass, 5)}`;
                             td.className = `invalid-cell ${colorClass}`;
-                            
                             if (cell.crossPass === 0) {
                                 td.innerText = "X";
                             } else {
                                 const idx1 = Math.min(cell.failedReason[0], cell.failedReason[1]);
                                 const idx2 = Math.max(cell.failedReason[0], cell.failedReason[1]);
-                                const reasonStr = `by (${stateNames[idx1]},${stateNames[idx2]})`;
-                                
-                                td.innerHTML = `X<span class="reason-text">${reasonStr}</span>`;
+                                td.innerHTML = `X<span class="reason-text">by (${stateNames[idx1]},${stateNames[idx2]})</span>`;
                             }
                         } else {
                             if (cell.dependencies.length === 0) {
@@ -437,53 +414,39 @@
                         }
                         tr.appendChild(td);
                     }
-
-                    for(let j = i; j < N - 1; j++) {
-                        const tdEmpty = document.createElement('td');
-                        tdEmpty.className = 'empty-cell';
-                        tr.appendChild(tdEmpty);
-                    }
-
                     tableHTML.appendChild(tr);
                 }
-
-                const trBottom = document.createElement('tr');
-                const tdEmptyCorner = document.createElement('td');
-                tdEmptyCorner.className = 'empty-cell';
-                trBottom.appendChild(tdEmptyCorner);
-
-                for (let j = 0; j < N - 1; j++) {
-                    const thCol = document.createElement('th');
-                    thCol.innerText = stateNames[j];
-                    trBottom.appendChild(thCol);
-                }
-                tableHTML.appendChild(trBottom);
-
-                const wrapper = document.createElement('div');
-                wrapper.className = 'impl-table-container';
-                wrapper.appendChild(tableHTML);
-                container.appendChild(wrapper);
+                container.appendChild(tableHTML);
             });
 
+            // --- 新增：最終化簡表格渲染 ---
             const finalTable = history[history.length - 1];
-            const eqStates = [];
-            for (let i = 1; i < N; i++) {
-                for (let j = 0; j < i; j++) {
-                    if (!finalTable[i][j].isInvalid) {
-                        eqStates.push(`[${stateNames[j]}] ≡ [${stateNames[i]}]`);
-                    }
-                }
-            }
+            const parent = {}; stateNames.forEach(n => parent[n] = n);
+            for(let i=1; i<N; i++) for(let j=0; j<i; j++) if(!finalTable[i][j].isInvalid) parent[stateNames[i]] = stateNames[j];
+            
+            const getRep = (s) => (parent[s] === s ? s : getRep(parent[s]));
+            const minMap = {};
+            stateNames.forEach((n, idx) => {
+                const rep = getRep(n);
+                if(!minMap[rep]) minMap[rep] = fsmData[idx];
+            });
 
-            const conclusion = document.createElement('h3');
-            if (eqStates.length > 0) {
-                conclusion.style.color = '#15803d';
-                conclusion.innerText = "Final Result: Equivalent States Found!\n" + eqStates.join(", ");
-            } else {
-                conclusion.style.color = '#dc2626';
-                conclusion.innerText = "Final Result: No equivalent states. The FSM is fully minimized.";
-            }
-            container.appendChild(conclusion);
+            const minContainer = document.createElement('div');
+            minContainer.innerHTML = `<h3>Final Minimized FSM</h3>`;
+            const minTableHTML = document.createElement('table');
+            minTableHTML.className = 'input-table';
+            minTableHTML.innerHTML = `<thead><tr><th>State</th><th>Next(0)</th><th>Next(1)</th><th>Out(0)</th>${isMealy ? '<th>Out(1)</th>' : ''}</tr></thead><tbody id="minBody"></tbody>`;
+            const minBody = minTableHTML.querySelector('#minBody');
+            
+            Object.keys(minMap).sort().forEach(rep => {
+                const row = minMap[rep];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${rep}</td><td>${stateNames[row.next0]}</td><td>${stateNames[row.next1]}</td><td>${row.out0}</td>${isMealy ? `<td>${row.out1}</td>` : ''}`;
+                minBody.appendChild(tr);
+            });
+            container.appendChild(minContainer);
+            container.appendChild(minTableHTML);
+            // ---------------------------
         }
     </script>
 </body>
