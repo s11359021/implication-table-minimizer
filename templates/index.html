@@ -376,18 +376,7 @@
 
                 const tableHTML = document.createElement('table');
                 tableHTML.className = 'impl-table';
-
-                // --- 修改重點：先產生最上方的表頭 (Column Headers) ---
-                const trTop = document.createElement('tr');
-                trTop.appendChild(document.createElement('th')); // 左上角空白格
-                for (let j = 0; j < N - 1; j++) {
-                    const th = document.createElement('th');
-                    th.innerText = stateNames[j];
-                    trTop.appendChild(th);
-                }
-                tableHTML.appendChild(trTop);
-                // --------------------------------------------------
-
+                
                 // 產生每一列 (Row Headers + Cells)
                 for (let i = 1; i < N; i++) {
                     const tr = document.createElement('tr');
@@ -436,13 +425,27 @@
                     tableHTML.appendChild(tr);
                 }
 
+                // --- 修改重點：在最下方產生表頭 (Column Headers) ---
+                const trBottom = document.createElement('tr');
+                const tdEmptyCorner = document.createElement('td'); // 左下角空白格
+                tdEmptyCorner.className = 'empty-cell';
+                trBottom.appendChild(tdEmptyCorner);
+
+                for (let j = 0; j < N - 1; j++) {
+                    const thCol = document.createElement('th');
+                    thCol.innerText = stateNames[j];
+                    trBottom.appendChild(thCol);
+                }
+                tableHTML.appendChild(trBottom);
+                // --------------------------------------------------
+
                 const wrapper = document.createElement('div');
                 wrapper.className = 'impl-table-container';
                 wrapper.appendChild(tableHTML);
                 container.appendChild(wrapper);
             });
 
-            // (下方原本的 finalTable 渲染邏輯保持不變...)
+            // (下方 Final Minimized FSM 表格渲染邏輯保持不變...)
             const finalTable = history[history.length - 1];
             const parent = {}; stateNames.forEach(n => parent[n] = n);
             for(let i=1; i<N; i++) for(let j=0; j<i; j++) if(!finalTable[i][j].isInvalid) parent[stateNames[i]] = stateNames[j];
@@ -461,12 +464,23 @@
             minTableHTML.innerHTML = `<thead><tr><th>State</th><th>Next(0)</th><th>Next(1)</th><th>Out(0)</th>${isMealy ? '<th>Out(1)</th>' : ''}</tr></thead><tbody id="minBody"></tbody>`;
             const minBody = minTableHTML.querySelector('#minBody');
             
+            // --- 修改這一段，加入 getRep 的名稱映射 ---
             Object.keys(minMap).sort().forEach(rep => {
                 const row = minMap[rep];
+                
+                // 這裡就是關鍵：把原本的指標轉換成該分組的「代表名稱」
+                const next0Rep = getRep(stateNames[row.next0]);
+                const next1Rep = getRep(stateNames[row.next1]);
+
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${rep}</td><td>${stateNames[row.next0]}</td><td>${stateNames[row.next1]}</td><td>${row.out0}</td>${isMealy ? `<td>${row.out1}</td>` : ''}`;
+                tr.innerHTML = `<td>${rep}</td>
+                                <td>${next0Rep}</td>
+                                <td>${next1Rep}</td>
+                                <td>${row.out0}</td>
+                                ${isMealy ? `<td>${row.out1}</td>` : ''}`;
                 minBody.appendChild(tr);
             });
+            // ----------------------------------------
             container.appendChild(minContainer);
             container.appendChild(minTableHTML);
         }
