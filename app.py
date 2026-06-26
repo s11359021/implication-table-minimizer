@@ -40,9 +40,6 @@ def scan_image():
     try:
         # 將前端傳來的 file stream 轉換成 Pillow 影像物件 image
         image = Image.open(file.stream)
-
-        # 實體化模型 gemini-3.5-flash
-        model = genai.GenerativeModel('ggemini-3.5-flash')
         
         # Prompt design: 要求 model 判斷 machine type and extract transition table
         prompt = """
@@ -61,13 +58,13 @@ def scan_image():
         Do NOT wrap the response in ```json markdown blocks.
         """
         
-        # Use gemini-3.5-falsh model 並將 prompt & image 帶入 user_input
-        interaction = client.interaction.create(
+        # Use gemini-3.5-falsh model 並將 prompt & image 帶入 contents
+        response = client.models.generate_content(
             model="gemini-3.5-flash",
-            user_input=[prompt, image]
+            contents=[prompt, image]
         )
         # get returned output 並去除頭尾空白
-        text = interaction.model_output.strip()
+        text = response.text.strip()        
         # 清除可能殘留 Markdown
         if text.startswith('```json'):
             text = text[7:-3].strip()
