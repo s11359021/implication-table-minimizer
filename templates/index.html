@@ -376,11 +376,23 @@
 
                 const tableHTML = document.createElement('table');
                 tableHTML.className = 'impl-table';
-                
+
+                // --- 修改重點：先產生最上方的表頭 (Column Headers) ---
+                const trTop = document.createElement('tr');
+                trTop.appendChild(document.createElement('th')); // 左上角空白格
+                for (let j = 0; j < N - 1; j++) {
+                    const th = document.createElement('th');
+                    th.innerText = stateNames[j];
+                    trTop.appendChild(th);
+                }
+                tableHTML.appendChild(trTop);
+                // --------------------------------------------------
+
+                // 產生每一列 (Row Headers + Cells)
                 for (let i = 1; i < N; i++) {
                     const tr = document.createElement('tr');
                     const thRow = document.createElement('th');
-                    thRow.innerText = stateNames[i];
+                    thRow.innerText = stateNames[i]; // 左側表頭 (Row Header)
                     tr.appendChild(thRow);
 
                     for (let j = 0; j < i; j++) {
@@ -414,12 +426,23 @@
                         }
                         tr.appendChild(td);
                     }
+                    
+                    // 補齊右側空白格，維持表格完整性
+                    for(let j = i; j < N - 1; j++) {
+                        const tdEmpty = document.createElement('td');
+                        tdEmpty.className = 'empty-cell';
+                        tr.appendChild(tdEmpty);
+                    }
                     tableHTML.appendChild(tr);
                 }
-                container.appendChild(tableHTML);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'impl-table-container';
+                wrapper.appendChild(tableHTML);
+                container.appendChild(wrapper);
             });
 
-            // --- 新增：最終化簡表格渲染 ---
+            // (下方原本的 finalTable 渲染邏輯保持不變...)
             const finalTable = history[history.length - 1];
             const parent = {}; stateNames.forEach(n => parent[n] = n);
             for(let i=1; i<N; i++) for(let j=0; j<i; j++) if(!finalTable[i][j].isInvalid) parent[stateNames[i]] = stateNames[j];
@@ -446,7 +469,6 @@
             });
             container.appendChild(minContainer);
             container.appendChild(minTableHTML);
-            // ---------------------------
         }
     </script>
 </body>
