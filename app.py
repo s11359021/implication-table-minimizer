@@ -65,6 +65,7 @@ def scan_image():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # 啟動伺服器，監聽 5000 port
-    print("Backend Server is running on http://localhost:5000")
-    app.run(port=5000, debug=True)
+    # Render 會自動給予一個 PORT 環境變數，如果沒有，我們預設使用 5000
+    port = int(os.environ.get("PORT", 5000))
+    # host 必須設定為 "0.0.0.0" 才能接收來自外部的連線
+    app.run(host="0.0.0.0", port=port)
