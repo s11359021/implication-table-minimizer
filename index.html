@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSM Implication Table Minimizer (AI Enhanced)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 { color: var(--primary); }
+
+        .card {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="number"], input[type="text"], select {
+            width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box;
+        }
+        
+        button {
+            background-color: var(--primary); color: white; border: none;
+            padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background-color: var(--primary-hover); }
+
+        /* FSM Input Table Styles */
+        table.input-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.input-table th, table.input-table td {
+            border: 1px solid var(--border); padding: 8px; text-align: center;
+        }
+        table.input-table th { background-color: #f1f5f9; }
+        table.input-table input { width: 80%; text-align: center; }
+
+        /* Implication Table Styles (Lower Triangular) */
+        .impl-table-container { margin-top: 20px; overflow-x: auto; margin-bottom: 40px; }
+        table.impl-table { border-collapse: collapse; margin-top: 10px; font-family: monospace; font-size: 14px; }
+        table.impl-table th, table.impl-table td {
+            width: 90px; height: 60px; text-align: center; vertical-align: middle; border: 1px solid #94a3b8;
+        }
+        table.impl-table th { background-color: #e2e8f0; font-weight: bold; }
+        table.impl-table td.empty-cell { border: none; background-color: transparent; }
+        
+        /* 動態顏色系統 */
+        table.impl-table td.valid-cell { color: #475569; }
+        table.impl-table td.dep-cell { color: #475569; font-size: 12px; }
+        
+        table.impl-table td.pass-0 { color: #dc2626; font-weight: bold; background-color: #fee2e2; }
+        table.impl-table td.pass-1 { color: #15803d; font-weight: bold; background-color: #dcfce7; }
+        table.impl-table td.pass-2 { color: #c2410c; font-weight: bold; background-color: #ffedd5; }
+        table.impl-table td.pass-3 { color: #6d28d9; font-weight: bold; background-color: #ede9fe; }
+        table.impl-table td.pass-4 { color: #0f766e; font-weight: bold; background-color: #ccfbf1; }
+        table.impl-table td.pass-5 { color: #92400e; font-weight: bold; background-color: #fef3c7; }
+
+        .reason-text { display: block; font-size: 11px; font-weight: normal; margin-top: 4px; opacity: 0.9; }
+
+        #step2, #step3 { display: none; }
+        .error { color: #dc2626; font-size: 14px; margin-top: 5px; }
+
+        /* AI Scan 區塊專用樣式 */
+        .ai-scan-box {
+            background-color: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 2px dashed #94a3b8;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>FSM Minimizer (Traceable Passes & AI Scan)</h1>
+
+    <div class="card" id="step1">
+        <h2>Step 1: Configuration</h2>
+        <div class="form-group">
+            <label for="machineType">Machine Type:</label>
+            <select id="machineType">
+                <option value="mealy">Mealy Machine</option>
+                <option value="moore">Moore Machine</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="numStates">Number of States (Rows in Image):</label>
+            <input type="number" id="numStates" min="2" max="20" value="7">
+        </div>
+        <button onclick="setupFSMTable()">Next</button>
+    </div>
+
+    <div class="card" id="step2">
+        <h2>Step 2: State Transitions & Outputs</h2>
+        
+        <div class="ai-scan-box">
+            <h3 style="margin-top: 0; color: #334155;">🤖 Auto-fill from Image (AI Scan)</h3>
+            <input type="file" id="imageInput" accept="image/*" style="margin-bottom: 10px;">
+            <br>
+            <button onclick="scanImage()" style="background-color: #0f766e;" id="scanBtn">Scan Table</button>
+            <span id="scanStatus" style="margin-left: 10px; font-weight: bold; color: #0f766e;"></span>
+        </div>
+
+        <table class="input-table" id="fsmInputTable">
+            <thead>
+                <tr>
+                    <th>Present State</th>
+                    <th>Next State (X=0)</th>
+                    <th>Next State (X=1)</th>
+                    <th>Output (X=0)</th>
+                    <th id="out1Header">Output (X=1)</th>
+                </tr>
+            </thead>
+            <tbody id="fsmInputBody">
+            </tbody>
+        </table>
+        <div id="inputError" class="error"></div>
+        <br>
+        <button onclick="runMinimization()">Run Minimization</button>
+        <button onclick="resetApp()" style="background-color: #64748b;">Reset</button>
+    </div>
+
+    <div class="card" id="step3">
+        <h2>Step 3: Minimization Process</h2>
+        <div id="resultsContainer"></div>
+        <button onclick="resetApp()" style="margin-top: 20px;">Start Over</button>
+    </div>
+
+    <script>
+        let isMealy = true;
+        let N = 0;
+
+        function setupFSMTable() {
+            const typeSelect = document.getElementById('machineType').value;
+            isMealy = (typeSelect === 'mealy');
+            N = parseInt(document.getElementById('numStates').value);
+
+            if (isNaN(N) || N < 2) {
+                alert("Please enter a valid number of states (>= 2).");
+                return;
+            }
+
+            document.getElementById('out1Header').style.display = isMealy ? 'table-cell' : 'none';
+            const tbody = document.getElementById('fsmInputBody');
+            tbody.innerHTML = '';
+
+            for (let i = 0; i < N; i++) {
+                const defaultName = String.fromCharCode(97 + i); 
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="text" class="state-name" value="${defaultName}" required></td>
+                    <td><input type="text" class="next0" required></td>
+                    <td><input type="text" class="next1" required></td>
+                    <td><input type="text" class="out0" required></td>
+                    <td style="display: ${isMealy ? 'table-cell' : 'none'};"><input type="text" class="out1"></td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        }
+
+        function resetApp() {
+            document.getElementById('step1').style.display = 'block';
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'none';
+            document.getElementById('inputError').innerText = '';
+            document.getElementById('scanStatus').innerText = '';
+            document.getElementById('imageInput').value = '';
+        }
+
+        // ==========================================
+        // 新增：串接後端 Python API 的非同步函數
+        // ==========================================
+        async function scanImage() {
+            const fileInput = document.getElementById('imageInput');
+            const statusText = document.getElementById('scanStatus');
+            const scanBtn = document.getElementById('scanBtn');
+
+            if (fileInput.files.length === 0) {
+                alert("Please upload an image first.");
+                return;
+            }
+
+            try {
+                statusText.innerText = "Uploading to server and analyzing... please wait.";
+                statusText.style.color = "#ca8a04"; // 黃色
+                scanBtn.disabled = true;
+
+                // 將圖片打包進 FormData
+                const formData = new FormData();
+                formData.append('image', fileInput.files[0]);
+
+                // 發送請求至我們剛寫好的 Python 本地伺服器
+                const response = await fetch('http://127.0.0.1:5000/scan', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+
+                const aiResponseJSON = await response.json();
+
+                // 自動填入表格
+                autoGenerateAndFill(aiResponseJSON); // 改成呼叫這個新函式
+                statusText.innerText = "Scan Complete! Please verify the data.";
+                statusText.style.color = "#16a34a"; // 綠色
+
+            } catch (error) {
+                statusText.innerText = `Scan failed: ${error.message}`;
+                statusText.style.color = "#dc2626"; // 紅色
+                console.error("Backend API Error:", error);
+            } finally {
+                scanBtn.disabled = false;
+            }
+        }
+
+        // AI 掃描完畢後，由「數據」反向驅動「介面生成」
+        function autoGenerateAndFill(aiData) {
+            const transitions = aiData.transitions;
+            const detectedType = aiData.detected_type; // 'mealy' 或 'moore'
+
+            // 1. AI 幫我們決定全域變數
+            N = transitions.length;
+            isMealy = (detectedType === 'mealy');
+
+            // 2. 動態修改 HTML 表格頭部（如果是 Moore，隱藏第二個 Output 標題）
+            const out1Header = document.getElementById('out1Header');
+            if (out1Header) {
+                out1Header.style.display = isMealy ? 'table-cell' : 'none';
+            }
+
+            // 3. 動態清空並「無中生有」生出 N 個輸入列
+            const tbody = document.getElementById('fsmInputBody');
+            tbody.innerHTML = '';
+
+            transitions.forEach((rowData, index) => {
+                const tr = document.createElement('tr');
+                
+                tr.innerHTML = `
+                    <td><input type="text" class="state-name" value="${rowData.state || ''}" required></td>
+                    <td><input type="text" class="next0" value="${rowData.next0 || ''}" required></td>
+                    <td><input type="text" class="next1" value="${rowData.next1 || ''}" required></td>
+                    <td><input type="text" class="out0" value="${rowData.out0 || ''}" required></td>
+                    <td style="display: ${isMealy ? 'table-cell' : 'none'};">
+                        <input type="text" class="out1" value="${rowData.out1 || rowData.out0 || ''}">
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 4. 在介面上給使用者一個驚喜提示
+            alert(`[AI Auto-Detect] Identified as a ${detectedType.toUpperCase()} machine with ${N} states!`);
+        }
+        // ==========================================
+
+        function runMinimization() {
+            const errorDiv = document.getElementById('inputError');
+            errorDiv.innerText = '';
+
+            const rows = document.querySelectorAll('#fsmInputBody tr');
+            const stateNames = [];
+            const fsmData = [];
+
+            rows.forEach(row => {
+                const name = row.querySelector('.state-name').value.trim();
+                if(!name) { errorDiv.innerText = "[Error] State name cannot be empty."; return; }
+                if(stateNames.includes(name)) { errorDiv.innerText = `[Error] Duplicate state name: ${name}`; return; }
+                stateNames.push(name);
+            });
+            if(errorDiv.innerText !== '') return;
+
+            for (let i = 0; i < N; i++) {
+                const row = rows[i];
+                const next0 = row.querySelector('.next0').value.trim();
+                const next1 = row.querySelector('.next1').value.trim();
+                const out0 = row.querySelector('.out0').value.trim();
+                const out1 = isMealy ? row.querySelector('.out1').value.trim() : out0;
+
+                if(!stateNames.includes(next0) || !stateNames.includes(next1)) {
+                    errorDiv.innerText = `[Error] Next state at row '${stateNames[i]}' is not defined in the state list.`;
+                    return;
+                }
+                
+                fsmData.push({
+                    next0: stateNames.indexOf(next0),
+                    next1: stateNames.indexOf(next1),
+                    out0: out0,
+                    out1: out1
+                });
+            }
+
+            let table = Array.from({length: N}, () => Array(N).fill(null).map(() => ({
+                isInvalid: false,
+                crossPass: -1,
+                dependencies: [],
+                failedReason: null
+            })));
+
+            const history = [];
+
+            // Pass 0
+            for (let i = 1; i < N; i++) {
+                for (let j = 0; j < i; j++) {
+                    const s_i = fsmData[i];
+                    const s_j = fsmData[j];
+
+                    if (s_i.out0 !== s_j.out0 || s_i.out1 !== s_j.out1) {
+                        table[i][j].isInvalid = true;
+                        table[i][j].crossPass = 0;
+                    } else {
+                        if (s_i.next0 !== s_j.next0) {
+                            table[i][j].dependencies.push([Math.max(s_i.next0, s_j.next0), Math.min(s_i.next0, s_j.next0)]);
+                        }
+                        if (s_i.next1 !== s_j.next1) {
+                            const dep1 = [Math.max(s_i.next1, s_j.next1), Math.min(s_i.next1, s_j.next1)];
+                            if (table[i][j].dependencies.length === 0 || 
+                                table[i][j].dependencies[0][0] !== dep1[0] || 
+                                table[i][j].dependencies[0][1] !== dep1[1]) {
+                                table[i][j].dependencies.push(dep1);
+                            }
+                        }
+                    }
+                }
+            }
+            history.push(JSON.parse(JSON.stringify(table)));
+
+            // Pass 1...K
+            let changed = true;
+            let passCount = 1;
+
+            while (changed) {
+                changed = false;
+                for (let i = 1; i < N; i++) {
+                    for (let j = 0; j < i; j++) {
+                        if (!table[i][j].isInvalid) {
+                            for (let dep of table[i][j].dependencies) {
+                                if (table[dep[0]][dep[1]].isInvalid) {
+                                    table[i][j].isInvalid = true;
+                                    table[i][j].crossPass = passCount;
+                                    table[i][j].failedReason = dep;
+                                    changed = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (changed) {
+                    history.push(JSON.parse(JSON.stringify(table)));
+                    passCount++;
+                }
+            }
+
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'block';
+            renderSteps(history, stateNames);
+        }
+
+        function renderSteps(history, stateNames) {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+            const N = stateNames.length;
+
+            history.forEach((tableState, passIndex) => {
+                const stepTitle = document.createElement('h3');
+                if (passIndex === 0) {
+                    stepTitle.innerHTML = "Step 1: Initial Setup (Output Mismatch & Dependencies)";
+                } else {
+                    stepTitle.innerHTML = `Step ${passIndex + 1}: Sweep Pass ${passIndex}`;
+                }
+                container.appendChild(stepTitle);
+
+                const tableHTML = document.createElement('table');
+                tableHTML.className = 'impl-table';
+                
+                for (let i = 1; i < N; i++) {
+                    const tr = document.createElement('tr');
+                    
+                    const thRow = document.createElement('th');
+                    thRow.innerText = stateNames[i];
+                    tr.appendChild(thRow);
+
+                    for (let j = 0; j < i; j++) {
+                        const td = document.createElement('td');
+                        const cell = tableState[i][j];
+
+                        if (cell.isInvalid) {
+                            const colorClass = `pass-${Math.min(cell.crossPass, 5)}`;
+                            td.className = `invalid-cell ${colorClass}`;
+                            
+                            if (cell.crossPass === 0) {
+                                td.innerText = "X";
+                            } else {
+                                const idx1 = Math.min(cell.failedReason[0], cell.failedReason[1]);
+                                const idx2 = Math.max(cell.failedReason[0], cell.failedReason[1]);
+                                const reasonStr = `by (${stateNames[idx1]},${stateNames[idx2]})`;
+                                
+                                td.innerHTML = `X<span class="reason-text">${reasonStr}</span>`;
+                            }
+                        } else {
+                            if (cell.dependencies.length === 0) {
+                                td.className = 'valid-cell';
+                                td.innerText = "OK";
+                            } else {
+                                td.className = 'dep-cell';
+                                let depStr = "";
+                                cell.dependencies.forEach(dep => {
+                                    const idx1 = Math.min(dep[0], dep[1]);
+                                    const idx2 = Math.max(dep[0], dep[1]);
+                                    depStr += `(${stateNames[idx1]},${stateNames[idx2]})<br>`;
+                                });
+                                td.innerHTML = depStr;
+                            }
+                        }
+                        tr.appendChild(td);
+                    }
+
+                    for(let j = i; j < N - 1; j++) {
+                        const tdEmpty = document.createElement('td');
+                        tdEmpty.className = 'empty-cell';
+                        tr.appendChild(tdEmpty);
+                    }
+
+                    tableHTML.appendChild(tr);
+                }
+
+                const trBottom = document.createElement('tr');
+                const tdEmptyCorner = document.createElement('td');
+                tdEmptyCorner.className = 'empty-cell';
+                trBottom.appendChild(tdEmptyCorner);
+
+                for (let j = 0; j < N - 1; j++) {
+                    const thCol = document.createElement('th');
+                    thCol.innerText = stateNames[j];
+                    trBottom.appendChild(thCol);
+                }
+                tableHTML.appendChild(trBottom);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'impl-table-container';
+                wrapper.appendChild(tableHTML);
+                container.appendChild(wrapper);
+            });
+
+            const finalTable = history[history.length - 1];
+            const eqStates = [];
+            for (let i = 1; i < N; i++) {
+                for (let j = 0; j < i; j++) {
+                    if (!finalTable[i][j].isInvalid) {
+                        eqStates.push(`[${stateNames[j]}] ≡ [${stateNames[i]}]`);
+                    }
+                }
+            }
+
+            const conclusion = document.createElement('h3');
+            if (eqStates.length > 0) {
+                conclusion.style.color = '#15803d';
+                conclusion.innerText = "Final Result: Equivalent States Found!\n" + eqStates.join(", ");
+            } else {
+                conclusion.style.color = '#dc2626';
+                conclusion.innerText = "Final Result: No equivalent states. The FSM is fully minimized.";
+            }
+            container.appendChild(conclusion);
+        }
+    </script>
+</body>
+</html>
