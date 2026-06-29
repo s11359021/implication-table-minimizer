@@ -60,7 +60,7 @@ def scan_image():
         
         # Use gemini-3.5-falsh model 並將 prompt & image 帶入 contents
         response = client.models.generate_content(
-            model="gemini-3.5-flash",
+            model="gemini-2.5-flash",
             contents=[prompt, image]
         )
         # get returned output 並去除頭尾空白
