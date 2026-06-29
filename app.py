@@ -90,8 +90,11 @@ def scan_image():
         return jsonify({"error": str(e)}), 500
 
 # ==========================================
-# 3. 啟動伺服器的開關
+# 3. 啟動伺服器的開關 (修正 Render Port 綁定問題)
 # ==========================================
 if __name__ == '__main__':
-    # debug=True 可以在你存檔時自動重啟伺服器，方便本地開發
-    app.run(debug=True, port=5000)
+    # 動態抓取 Render 分配的 PORT，如果是本地端開發則預設使用 5000
+    port = int(os.environ.get('PORT', 5000))
+    
+    # 必須加上 host='0.0.0.0'，Render 才掃描得到
+    app.run(host='0.0.0.0', port=port)
