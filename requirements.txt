@@ -4,3 +4,4 @@ python-dotenv
 pillow
 google-genai>=2.3.0
 gunicorn
+groq
